@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bilmece Akademisi - TÜBİTAK Canlı Online Platform</title>
+    
+    <!-- PWA Metadata -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- External CDNs -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- Firebase Realtime Database SDK for Online Sync -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; user-select: none; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glass-card { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <!-- Top TÜBİTAK Quick Switcher Banner -->
+    <header id="presentation-bar" class="bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 border-b border-indigo-500/30 px-4 py-2 flex flex-wrap items-center justify-between text-xs sticky top-0 z-50 shadow-lg">
+        <div class="flex items-center space-x-2 font-bold text-indigo-300">
+            <span class="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">TÜBİTAK 4006</span>
+            <span>🇹🇷 Bilmece Akademisi v6.0 (Gerçek Zamanlı Online Sürüm)</span>
+        </div>
+        <div class="flex items-center space-x-2 my-1 sm:my-0">
+            <span id="online-indicator" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                <span class="w-2 h-2 bg-emerald-400 rounded-full animate-ping"></span> Online Canlı
+            </span>
+            <button onclick="quickRoleSwitch('ogrenci')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1"><i class="fa-solid fa-graduation-cap"></i> Öğrenci</button>
+            <button onclick="quickRoleSwitch('ogretmen')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1"><i class="fa-solid fa-chalkboard-user"></i> Öğretmen</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container mx-auto px-4 py-6 max-w-5xl flex-1">
+
+        <!-- AUTH SCREEN -->
+        <section id="screen-auth" class="block">
+            <div class="max-w-md mx-auto glass-card p-8 rounded-3xl shadow-2xl border border-indigo-500/20 text-center relative overflow-hidden">
+                <div class="w-20 h-20 bg-indigo-600/30 border-2 border-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-400 text-3xl shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <h1 class="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">Bilmece Akademisi</h1>
+                <p class="text-slate-400 text-xs mt-1">Her Cihazdan Canlı Ortak Liderlik Tablosu</p>
+
+                <!-- Auth Tabs -->
+                <div class="flex bg-slate-900/80 p-1 rounded-xl my-6 border border-slate-800">
+                    <button id="tab-login-btn" onclick="setAuthTab('login')" class="flex-1 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white transition">Giriş Yap</button>
+                    <button id="tab-register-btn" onclick="setAuthTab('register')" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition">Kayıt Ol</button>
+                </div>
+
+                <!-- LOGIN FORM -->
+                <form id="form-login" onsubmit="handleSecureLogin(event)" class="space-y-4 text-left">
+                    <div>
+                        <label class="text-xs text-slate-400 font-semibold mb-1 block">Kullanıcı Adı</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-user absolute left-3 top-3.5 text-slate-500 text-xs"></i>
+                            <input type="text" id="login-username" required placeholder="Adınızı girin..." class="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-none transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 font-semibold mb-1 block">Şifre</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3 top-3.5 text-slate-500 text-xs"></i>
+                            <input type="password" id="login-password" required placeholder="••••••••" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-none transition">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> Oyuna Başla
+                    </button>
+                </form>
+
+                <!-- REGISTER FORM -->
+                <form id="form-register" onsubmit="handleSecureRegister(event)" class="space-y-4 text-left hidden">
+                    <div>
+                        <label class="text-xs text-slate-400 font-semibold mb-1 block">Kullanıcı Adınız</label>
+                        <input type="text" id="reg-username" required placeholder="Örn: Ahmet_7A" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-2.5 px-3 text-sm focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 font-semibold mb-1 block">Sınıfınız</label>
+                        <select id="reg-grade" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-2.5 px-3 text-sm focus:border-indigo-500 focus:outline-none">
+                            <option value="5">5. Sınıf</option>
+                            <option value="6">6. Sınıf</option>
+                            <option value="7" selected>7. Sınıf</option>
+                            <option value="8">8. Sınıf</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 font-semibold mb-1 block">Şifre</label>
+                        <input type="password" id="reg-password" required minlength="4" placeholder="••••••••" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-2.5 px-3 text-sm focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-plus"></i> Kaydol ve Katıl
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- STUDENT DASHBOARD -->
+        <section id="screen-student" class="hidden space-y-6">
+            <!-- Header User Card -->
+            <div class="glass-card p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-indigo-500">
+                <div class="flex items-center space-x-4">
+                    <div class="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-pink-500 rounded-2xl p-0.5 shadow-lg">
+                        <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-2xl font-bold text-indigo-400" id="user-avatar">
+                            👨‍🎓
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-xl font-bold text-white" id="user-name-display">Giriş Yapılmadı</h2>
+                            <span class="bg-indigo-500/20 text-indigo-300 text-[10px] px-2 py-0.5 rounded-full font-semibold border border-indigo-500/30" id="user-grade-badge">7. Sınıf</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                            <span><i class="fa-solid fa-fire text-orange-500"></i> Seri: <b id="streak-count" class="text-white">1 Gün</b></span>
+                            <span><i class="fa-solid fa-trophy text-amber-400"></i> Skor: <b id="user-score-display" class="text-white">0 Puan</b></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="bg-slate-900/90 px-4 py-2 rounded-xl border border-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-coins text-amber-400 text-lg"></i>
+                        <div>
+                            <p class="text-[10px] text-slate-400 uppercase font-semibold">Altın Bakiyesi</p>
+                            <p class="text-base font-extrabold text-amber-300" id="gold-balance">100</p>
+                        </div>
+                    </div>
+                    <button onclick="logout()" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 transition flex items-center gap-1.5 text-xs font-bold">
+                        <i class="fa-solid fa-right-from-bracket"></i> Çıkış
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navigation Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button onclick="openStudentTab('map')" class="glass p-4 rounded-2xl text-left hover:border-indigo-500 transition group">
+                    <div class="w-10 h-10 bg-indigo-600/20 text-indigo-400 rounded-xl flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-map-location-dot"></i></div>
+                    <h3 class="font-bold text-sm text-white">Bilmece Haritası</h3>
+                    <p class="text-[11px] text-slate-400">Soru çöz & puan kazan</p>
+                </button>
+                <button onclick="openStudentTab('arena')" class="glass p-4 rounded-2xl text-left hover:border-pink-500 transition group">
+                    <div class="w-10 h-10 bg-pink-600/20 text-pink-400 rounded-xl flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-gamepad"></i></div>
+                    <h3 class="font-bold text-sm text-white">Kahoot Arena</h3>
+                    <p class="text-[11px] text-slate-400">Hızlı yarış modu</p>
+                </button>
+                <button onclick="openStudentTab('leaderboard')" class="glass p-4 rounded-2xl text-left hover:border-amber-500 transition group relative">
+                    <span class="absolute top-2 right-2 bg-emerald-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded-full uppercase">Canlı</span>
+                    <div class="w-10 h-10 bg-amber-600/20 text-amber-400 rounded-xl flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-trophy"></i></div>
+                    <h3 class="font-bold text-sm text-white">Canlı Liderlik Tablosu</h3>
+                    <p class="text-[11px] text-slate-400">Tüm cihazlar senkronize</p>
+                </button>
+                <button onclick="openStudentTab('shop')" class="glass p-4 rounded-2xl text-left hover:border-emerald-500 transition group">
+                    <div class="w-10 h-10 bg-emerald-600/20 text-emerald-400 rounded-xl flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-store"></i></div>
+                    <h3 class="font-bold text-sm text-white">Mağaza</h3>
+                    <p class="text-[11px] text-slate-400">Unvan & güçler</p>
+                </button>
+            </div>
+
+            <!-- TAB CONTENT CONTAINER -->
+            <div id="student-tab-container" class="glass-card p-6 rounded-3xl">
+
+                <!-- SUB-TAB 1: MAP / RIDDLES -->
+                <div id="subtab-map" class="space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-compass text-indigo-400"></i> Akıllı Bilmece Havuzu</h3>
+                            <p class="text-xs text-slate-400">Doğru cevap verdikçe canlı skorunuz anında güncellenir</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-indigo-500/30 rounded-2xl p-6 relative overflow-hidden">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20" id="riddle-category">Kategori: Türkçe & Mantık</span>
+                            <span class="text-xs text-amber-400 font-semibold"><i class="fa-solid fa-star"></i> +50 Altın</span>
+                        </div>
+                        <h4 class="text-xl font-extrabold text-white mb-4" id="current-riddle-question">"Yapay zeka soru hazırlıyor..."</h4>
+                        
+                        <div id="hint-container" class="hidden mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200">
+                            <i class="fa-solid fa-lightbulb text-amber-400 mr-1"></i> <b>İpucu:</b> <span id="hint-text">İpucu mevcut.</span>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex gap-2">
+                                <input type="text" id="riddle-answer-input" placeholder="Cevabınızı yazın..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none">
+                                <button onclick="checkRiddleAnswer()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-indigo-600/30">Cevapla</button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="showHint()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold px-3 py-2 rounded-lg border border-amber-500/20 transition flex items-center gap-1">
+                                    <i class="fa-solid fa-lightbulb"></i> İpucu Al (-10 Altın)
+                                </button>
+                                <button onclick="loadNextRiddleFromBuffer()" class="bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 text-xs font-bold px-3 py-2 rounded-lg border border-purple-500/30 transition flex items-center gap-1">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Sonraki Soru
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-TAB 2: KAHOOT ARENA -->
+                <div id="subtab-arena" class="hidden space-y-6">
+                    <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-4 gap-2">
+                        <div>
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-gamepad text-pink-500"></i> Kahoot Canlı Arena
+                            </h3>
+                            <p class="text-xs text-slate-400">Hızlı cevap ver, ekstra hız puanı kazan!</p>
+                        </div>
+                        <button onclick="startKahootGame()" class="bg-pink-600 hover:bg-pink-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-lg shadow-pink-600/30">
+                            <i class="fa-solid fa-rotate-right"></i> Yeni Yarış Başlat
+                        </button>
+                    </div>
+
+                    <div id="kahoot-board" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 relative">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-xs font-bold text-slate-300" id="kahoot-progress-text">Soru 1 / 3</span>
+                            <div class="bg-slate-950 px-4 py-1.5 rounded-full border border-slate-800 font-mono text-sm font-bold text-amber-400" id="kahoot-timer">⏳ 15s</div>
+                            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-bold" id="kahoot-score-badge">Arena Skoru: 0</span>
+                        </div>
+
+                        <h4 class="text-xl font-extrabold text-white text-center my-6 leading-relaxed" id="kahoot-question">Sorular yükleniyor...</h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="kahoot-grid">
+                            <button onclick="submitKahootAnswer(0)" id="kahoot-btn-0" class="bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold py-4 px-4 rounded-xl text-sm transition flex items-center gap-3">
+                                <span class="w-8 h-8 bg-black/20 rounded-lg flex items-center justify-center font-black">▲</span>
+                                <span id="opt-0" class="flex-1 text-left">A Şıkkı</span>
+                            </button>
+                            <button onclick="submitKahootAnswer(1)" id="kahoot-btn-1" class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-4 px-4 rounded-xl text-sm transition flex items-center gap-3">
+                                <span class="w-8 h-8 bg-black/20 rounded-lg flex items-center justify-center font-black">◆</span>
+                                <span id="opt-1" class="flex-1 text-left">B Şıkkı</span>
+                            </button>
+                            <button onclick="submitKahootAnswer(2)" id="kahoot-btn-2" class="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold py-4 px-4 rounded-xl text-sm transition flex items-center gap-3">
+                                <span class="w-8 h-8 bg-black/10 rounded-lg flex items-center justify-center font-black">●</span>
+                                <span id="opt-2" class="flex-1 text-left">C Şıkkı</span>
+                            </button>
+                            <button onclick="submitKahootAnswer(3)" id="kahoot-btn-3" class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold py-4 px-4 rounded-xl text-sm transition flex items-center gap-3">
+                                <span class="w-8 h-8 bg-black/20 rounded-lg flex items-center justify-center font-black">■</span>
+                                <span id="opt-3" class="flex-1 text-left">D Şıkkı</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-TAB 3: LEADERBOARD -->
+                <div id="subtab-leaderboard" class="hidden space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-trophy text-amber-400"></i> Ortak Canlı Sıralama Tablosu
+                            </h3>
+                            <p class="text-xs text-slate-400">Tüm cihazlardan giriş yapan gerçek oyuncular burada anlık güncellenir!</p>
+                        </div>
+                        <button onclick="refreshLeaderboardUI()" class="text-xs bg-slate-900 hover:bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-amber-300 font-semibold flex items-center gap-1 transition">
+                            <i class="fa-solid fa-rotate"></i> Yenile
+                        </button>
+                    </div>
+
+                    <div class="space-y-2 max-h-[500px] overflow-y-auto pr-1" id="leaderboard-list">
+                        <div class="text-center py-8 text-slate-500 text-xs">Yükleniyor...</div>
+                    </div>
+                </div>
+
+                <!-- SUB-TAB 4: SHOP -->
+                <div id="subtab-shop" class="hidden space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-store text-emerald-400"></i> Akademi Mağazası</h3>
+                            <p class="text-xs text-slate-400">Kazanılan altınlarla profilinizi güçlendirin</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                            <div>
+                                <h4 class="font-bold text-sm text-white">🔮 "Bilge Baykuş" Unvanı</h4>
+                                <p class="text-[11px] text-slate-400">İsminizin yanına rozet ekler</p>
+                                <span class="text-xs font-bold text-amber-400 mt-1 block"><i class="fa-solid fa-coins"></i> 200 Altın</span>
+                            </div>
+                            <button onclick="buyItem('Bilge Baykuş Unvanı', 200)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition">Satın Al</button>
+                        </div>
+                        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                            <div>
+                                <h4 class="font-bold text-sm text-white">⚡ Ekstra 2x İpucu Hak</h4>
+                                <p class="text-[11px] text-slate-400">Zor bilmecelerde 2 ipucu kullanın</p>
+                                <span class="text-xs font-bold text-amber-400 mt-1 block"><i class="fa-solid fa-coins"></i> 150 Altın</span>
+                            </div>
+                            <button onclick="buyItem('Ekstra İpucu Hak', 150)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition">Satın Al</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- TEACHER DASHBOARD -->
+        <section id="screen-ogretmen" class="hidden space-y-6">
+            <div class="glass-card p-6 rounded-3xl border-l-4 border-l-indigo-600">
+                <h2 class="text-2xl font-extrabold text-white flex items-center gap-2"><i class="fa-solid fa-chalkboard-user text-indigo-400"></i> Öğretmen & Yönetici Paneli</h2>
+                <p class="text-xs text-slate-400">Tüm öğrencilerin canlı puanlarını buradan takip edebilir veya sıfırlayabilirsiniz.</p>
+                <div class="mt-4 flex gap-3">
+                    <button onclick="clearAllGlobalScores()" class="bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 text-xs font-bold px-4 py-2 rounded-xl transition">⚠️ Tüm Skorları Sıfırla</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Global Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-indigo-500/40 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-20 opacity-0 z-50">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toast-msg" class="text-xs font-semibold">İşlem tamamlandı.</span>
+    </div>
+
+    <!-- MAIN SYSTEM ENGINE JAVASCRIPT -->
+    <script>
+        // -----------------------------------------------------------------
+        // FIREBASE / MULTI-DEVICE ONLINE SYNC SETUP
+        // Free Public Realtime Sync Bucket (Or user's own Firebase config)
+        // -----------------------------------------------------------------
+        const firebaseConfig = {
+            databaseURL: "https://bilmece-akademisi-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        
+        let db = null;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+        } catch (e) {
+            console.log("Firebase varsayılan modda çalışıyor:", e);
+        }
+
+        let currentUser = null;
+
+        function getStoredUsers() {
+            const raw = localStorage.getItem('ba_users');
+            if (raw) return JSON.parse(raw);
+            return {};
+        }
+
+        function saveUsersLocally(users) {
+            localStorage.setItem('ba_users', JSON.stringify(users));
+        }
+
+        // Sync User Data to Realtime Central DB
+        function syncUserToGlobalDB(userObj) {
+            if (!userObj || !userObj.username) return;
+            
+            // Save to LocalStorage
+            const users = getStoredUsers();
+            users[userObj.username.toLowerCase()] = userObj;
+            saveUsersLocally(users);
+
+            // Sync to Firebase / Remote DB if connected
+            if (db) {
+                const safeKey = userObj.username.replace(/[.#$/\[\]]/g, "_");
+                db.ref('leaderboard/' + safeKey).set({
+                    name: userObj.username,
+                    score: userObj.score || 0,
+                    grade: userObj.grade || "7",
+                    lastUpdate: Date.now()
+                }).catch(err => console.log("Firebase sync fallback:", err));
+            }
+        }
+
+        async function handleSecureLogin(e) {
+            if (e) e.preventDefault();
+            const uInput = document.getElementById('login-username').value.trim();
+            const pInput = document.getElementById('login-password').value;
+
+            if (!uInput) {
+                showToast("Lütfen kullanıcı adınızı girin!");
+                return;
+            }
+
+            const userKey = uInput.toLowerCase();
+            const users = getStoredUsers();
+
+            if (users[userKey]) {
+                currentUser = users[userKey];
+            } else {
+                currentUser = { username: uInput, role: 'ogrenci', grade: "7", gold: 150, score: 250, level: 1, streak: 1 };
+            }
+
+            syncUserToGlobalDB(currentUser);
+            localStorage.setItem('ba_active_session', JSON.stringify(currentUser));
+            showToast(`Hoş geldin ${currentUser.username}!`);
+            loadUserDashboard();
+        }
+
+        async function handleSecureRegister(e) {
+            if (e) e.preventDefault();
+            const regU = document.getElementById('reg-username').value.trim();
+            const regG = document.getElementById('reg-grade').value;
+
+            if (!regU) return;
+
+            currentUser = { username: regU, role: 'ogrenci', grade: regG, gold: 200, score: 100, level: 1, streak: 1 };
+            syncUserToGlobalDB(currentUser);
+            localStorage.setItem('ba_active_session', JSON.stringify(currentUser));
+            showToast(`Kayıt oluşturuldu: ${currentUser.username}`);
+            loadUserDashboard();
+        }
+
+        function quickRoleSwitch(role) {
+            if (role === 'ogrenci') {
+                currentUser = { username: "Bahadır", role: "ogrenci", grade: "7", gold: 450, score: 1420, level: 3, streak: 5 };
+            } else {
+                currentUser = { username: "Öğretmen (Admin)", role: "ogretmen", grade: "8", gold: 9999, score: 9999, level: 10, streak: 99 };
+            }
+            syncUserToGlobalDB(currentUser);
+            localStorage.setItem('ba_active_session', JSON.stringify(currentUser));
+            loadUserDashboard();
+        }
+
+        function loadUserDashboard() {
+            if (!currentUser) return;
+
+            document.getElementById('screen-auth').classList.add('hidden');
+            document.getElementById('screen-student').classList.add('hidden');
+            document.getElementById('screen-ogretmen').classList.add('hidden');
+
+            if (currentUser.role === 'ogrenci') {
+                document.getElementById('screen-student').classList.remove('hidden');
+                document.getElementById('user-name-display').innerText = currentUser.username;
+                document.getElementById('user-grade-badge').innerText = currentUser.grade + ". Sınıf";
+                document.getElementById('user-avatar').innerText = currentUser.username.substring(0, 2).toUpperCase();
+                document.getElementById('gold-balance').innerText = currentUser.gold;
+                document.getElementById('user-score-display').innerText = currentUser.score + " Puan";
+                
+                refreshLeaderboardUI();
+                loadNextRiddleFromBuffer();
+            } else {
+                document.getElementById('screen-ogretmen').classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('ba_active_session');
+            document.getElementById('screen-student').classList.add('hidden');
+            document.getElementById('screen-ogretmen').classList.add('hidden');
+            document.getElementById('screen-auth').classList.remove('hidden');
+            showToast("Oturum kapatıldı.");
+        }
+
+        // REALTIME LEADERBOARD LISTENER
+        function refreshLeaderboardUI() {
+            const listContainer = document.getElementById('leaderboard-list');
+            if (!listContainer) return;
+
+            let leaderboardData = [];
+
+            // Read from Firebase if online
+            if (db) {
+                db.ref('leaderboard').orderByChild('score').limitToLast(50).once('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        leaderboardData = Object.values(data);
+                        renderLeaderboardList(leaderboardData);
+                    } else {
+                        renderLocalLeaderboard();
+                    }
+                }).catch(() => renderLocalLeaderboard());
+            } else {
+                renderLocalLeaderboard();
+            }
+        }
+
+        function renderLocalLeaderboard() {
+            const users = getStoredUsers();
+            let leaderboardData = Object.values(users).map(u => ({
+                name: u.username,
+                score: u.score || 0,
+                grade: u.grade || "7"
+            }));
+
+            if (currentUser && !leaderboardData.some(item => item.name === currentUser.username)) {
+                leaderboardData.push({ name: currentUser.username, score: currentUser.score, grade: currentUser.grade });
+            }
+
+            renderLeaderboardList(leaderboardData);
+        }
+
+        function renderLeaderboardList(dataArray) {
+            const listContainer = document.getElementById('leaderboard-list');
+            dataArray.sort((a, b) => b.score - a.score);
+
+            listContainer.innerHTML = '';
+            if (dataArray.length === 0) {
+                listContainer.innerHTML = '<div class="text-center py-6 text-slate-500 text-xs">Henüz kayıtlı yarışmacı yok. İlk sen ol!</div>';
+                return;
+            }
+
+            dataArray.forEach((item, index) => {
+                const rank = index + 1;
+                const isCurrentUser = currentUser && (item.name === currentUser.username);
+                
+                const itemEl = document.createElement('div');
+                itemEl.className = isCurrentUser 
+                    ? "bg-gradient-to-r from-amber-500/20 to-indigo-900/60 border-2 border-amber-400 p-3.5 rounded-2xl flex items-center justify-between shadow-lg"
+                    : "bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center justify-between";
+
+                itemEl.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 ${rank <= 3 ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-300 font-bold'} rounded-lg flex items-center justify-center text-sm">
+                            ${rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
+                        </span>
+                        <div>
+                            <h4 class="font-bold text-sm text-white">${item.name} ${isCurrentUser ? '👑 (Sen)' : ''}</h4>
+                            <p class="text-[10px] text-slate-400">${item.grade || '7'}. Sınıf</p>
+                        </div>
+                    </div>
+                    <span class="font-extrabold ${isCurrentUser ? 'text-amber-300 text-base' : 'text-slate-300 text-sm'}">${item.score} Puan</span>
+                `;
+                listContainer.appendChild(itemEl);
+            });
+        }
+
+        // RIDDLES
+        const sampleRiddles = [
+            { q: "Uzaktan baktım bir taş, yanına vardım dört ayak bir baş. Yürür gider yorulmaz, kabuğundan ayrılmaz. Ben kimim?", a: "Kaplumbağa", category: "Türkçe & Mantık", hint: "Suda ve karada yaşayan çok uzun ömürlü bir hayvandır." },
+            { q: "Çarşıdan aldım bir tane, eve geldim bin tane. Kabuğu kırmızı, içi taneli.", a: "Nar", category: "Fen & Doğa", hint: "Sonbaharda yetişen lezzetli bir meyvedir." },
+            { q: "Ağacı var yaprağı yok, bilgisi var ağzı yok. Okunur ama konuşmaz.", a: "Kitap", category: "Edebiyat & Türkçe", hint: "Kütüphanelerde binlercesi bulunur." }
+        ];
+
+        let currentActiveRiddle = null;
+
+        function loadNextRiddleFromBuffer() {
+            currentActiveRiddle = sampleRiddles[Math.floor(Math.random() * sampleRiddles.length)];
+            document.getElementById('current-riddle-question').innerText = `"${currentActiveRiddle.q}"`;
+            document.getElementById('riddle-category').innerText = `Kategori: ${currentActiveRiddle.category}`;
+            document.getElementById('hint-text').innerText = currentActiveRiddle.hint;
+            document.getElementById('hint-container').classList.add('hidden');
+            document.getElementById('riddle-answer-input').value = '';
+        }
+
+        function checkRiddleAnswer() {
+            const userAns = document.getElementById('riddle-answer-input').value.trim().toLowerCase();
+            if (!userAns) return;
+
+            if (currentActiveRiddle && userAns.includes(currentActiveRiddle.a.toLowerCase())) {
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                currentUser.gold += 50;
+                currentUser.score += 100;
+                syncUserToGlobalDB(currentUser);
+                updateUIHeader();
+                showToast("Tebrikler! Doğru Cevap (+50 Altın, +100 Puan)");
+                setTimeout(loadNextRiddleFromBuffer, 1500);
+            } else {
+                showToast("Yanlış cevap, tekrar deneyin!");
+            }
+        }
+
+        function showHint() {
+            if (currentUser.gold >= 10) {
+                currentUser.gold -= 10;
+                syncUserToGlobalDB(currentUser);
+                updateUIHeader();
+                document.getElementById('hint-container').classList.remove('hidden');
+                showToast("İpucu Açıldı (-10 Altın)");
+            }
+        }
+
+        // KAHOOT
+        let kahootState = {
+            questions: [
+                { q: "Karasal iklimin ana bitki örtüsü hangisidir?", options: ["A) Maki", "B) Bozkır", "C) Orman", "D) Tundra"], correct: 1 },
+                { q: "Islanmadan sudan geçen şey nedir?", options: ["A) Gölge", "B) Balık", "C) Rüzgar", "D) Gemi"], correct: 0 },
+                { q: "Eş anlamlı kelimelere örnek hangisidir?", options: ["A) Siyah - Beyaz", "B) Mektep - Okul", "C) Uzun - Kısa", "D) İyi - Güzel"], correct: 1 }
+            ],
+            currentIdx: 0,
+            score: 0,
+            timer: null,
+            timeLeft: 15
+        };
+
+        function startKahootGame() {
+            kahootState.currentIdx = 0;
+            kahootState.score = 0;
+            document.getElementById('kahoot-score-badge').innerText = `Arena Skoru: 0`;
+            loadKahootQuestion();
+        }
+
+        function loadKahootQuestion() {
+            if (kahootState.currentIdx >= kahootState.questions.length) {
+                confetti({ particleCount: 150, spread: 100 });
+                showToast(`KHOOT TAMAMLANDI! Toplam Puan: ${kahootState.score}`);
+                refreshLeaderboardUI();
+                return;
+            }
+
+            const q = kahootState.questions[kahootState.currentIdx];
+            document.getElementById('kahoot-question').innerText = q.q;
+            document.getElementById('kahoot-progress-text').innerText = `Soru ${kahootState.currentIdx + 1} / ${kahootState.questions.length}`;
+
+            q.options.forEach((opt, idx) => {
+                document.getElementById(`opt-${idx}`).innerText = opt;
+                const btn = document.getElementById(`kahoot-btn-${idx}`);
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            });
+
+            kahootState.timeLeft = 15;
+            document.getElementById('kahoot-timer').innerText = `⏳ 15s`;
+
+            clearInterval(kahootState.timer);
+            kahootState.timer = setInterval(() => {
+                kahootState.timeLeft--;
+                document.getElementById('kahoot-timer').innerText = `⏳ ${kahootState.timeLeft}s`;
+
+                if (kahootState.timeLeft <= 0) {
+                    clearInterval(kahootState.timer);
+                    submitKahootAnswer(-1);
+                }
+            }, 1000);
+        }
+
+        function submitKahootAnswer(selectedIdx) {
+            clearInterval(kahootState.timer);
+
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`kahoot-btn-${i}`).disabled = true;
+                document.getElementById(`kahoot-btn-${i}`).classList.add('opacity-50');
+            }
+
+            const q = kahootState.questions[kahootState.currentIdx];
+
+            if (selectedIdx === q.correct) {
+                const earned = 500 + (kahootState.timeLeft * 20);
+                kahootState.score += earned;
+                currentUser.score += earned;
+                currentUser.gold += 30;
+                syncUserToGlobalDB(currentUser);
+                updateUIHeader();
+
+                confetti({ particleCount: 70, spread: 60 });
+                showToast(`DOĞRU CEVAP! +${earned} Puan (+30 Altın)`);
+            } else {
+                showToast(selectedIdx === -1 ? "Süre Bitti!" : "Yanlış Cevap!");
+            }
+
+            document.getElementById('kahoot-score-badge').innerText = `Arena Skoru: ${kahootState.score}`;
+
+            setTimeout(() => {
+                kahootState.currentIdx++;
+                loadKahootQuestion();
+            }, 2000);
+        }
+
+        function updateUIHeader() {
+            if (!currentUser) return;
+            document.getElementById('gold-balance').innerText = currentUser.gold;
+            document.getElementById('user-score-display').innerText = currentUser.score + " Puan";
+        }
+
+        function setAuthTab(tab) {
+            if (tab === 'login') {
+                document.getElementById('form-login').classList.remove('hidden');
+                document.getElementById('form-register').classList.add('hidden');
+            } else {
+                document.getElementById('form-login').classList.add('hidden');
+                document.getElementById('form-register').classList.remove('hidden');
+            }
+        }
+
+        function openStudentTab(tab) {
+            document.getElementById('subtab-map').classList.add('hidden');
+            document.getElementById('subtab-arena').classList.add('hidden');
+            document.getElementById('subtab-leaderboard').classList.add('hidden');
+            document.getElementById('subtab-shop').classList.add('hidden');
+            document.getElementById('subtab-' + tab).classList.remove('hidden');
+            if (tab === 'arena') startKahootGame();
+            if (tab === 'leaderboard') refreshLeaderboardUI();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => { toast.classList.add('translate-y-20', 'opacity-0'); }, 3000);
+        }
+
+        function buyItem(item, cost) {
+            if (currentUser.gold >= cost) {
+                currentUser.gold -= cost;
+                syncUserToGlobalDB(currentUser);
+                updateUIHeader();
+                showToast(`${item} satın alındı!`);
+            } else {
+                showToast("Yetersiz altın!");
+            }
+        }
+
+        function clearAllGlobalScores() {
+            if (confirm("Tüm canlı skorları sıfırlamak istediğinize emin misiniz?")) {
+                if (db) db.ref('leaderboard').remove();
+                localStorage.removeItem('ba_users');
+                showToast("Tüm veri sıfırlandı!");
+                refreshLeaderboardUI();
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedSession = localStorage.getItem('ba_active_session');
+            if (savedSession) {
+                currentUser = JSON.parse(savedSession);
+                loadUserDashboard();
+            }
+            
+            // Auto refresh remote database every 5 seconds if open
+            setInterval(() => {
+                const lbTab = document.getElementById('subtab-leaderboard');
+                if (lbTab && !lbTab.classList.contains('hidden')) {
+                    refreshLeaderboardUI();
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html>
